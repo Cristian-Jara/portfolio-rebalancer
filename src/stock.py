@@ -12,8 +12,13 @@ class Stock:
     def __init__(self, stock_id: str, last_price: Number) -> None:
         if not isinstance(stock_id, str) or not stock_id.strip():
             raise InvalidStockIdError(ErrorMessages.EMPTY_STOCK_ID)
-        self.stock_id: str = stock_id.strip().upper()
+        self._stock_id: str = stock_id.strip().upper()
         self._last_price: Decimal = self._validate_price(last_price)
+
+    @property
+    def stock_id(self) -> str:
+        """Return the stock's immutable identifier."""
+        return self._stock_id
 
     @staticmethod
     def _validate_price(price: Number) -> Decimal:

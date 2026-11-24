@@ -74,6 +74,11 @@ class TestStock(unittest.TestCase):
         self.assertTrue(issubclass(InvalidStockError, PortfolioError))
         self.assertTrue(issubclass(InvalidStockError, ValueError))
 
+    def test_stock_id_is_immutable(self) -> None:
+        meta = Stock("META", 500)
+        with self.assertRaises(AttributeError):
+            meta.stock_id = "AAPL"
+
 
 if __name__ == "__main__":
     unittest.main()

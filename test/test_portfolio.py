@@ -159,9 +159,7 @@ class TestPortfolioRebalance(unittest.TestCase):
 
         self.assertEqual(orders["META"].action, TradeAction.SELL)
         self.assertEqual(orders["META"].amount, Decimal("1800.00"))
-        self.assertAlmostEqual(
-            orders["META"].shares, Decimal("1800") / Decimal("700"), places=9
-        )
+        self.assertEqual(orders["META"].shares, Decimal("1800") / Decimal("700"))
 
         self.assertEqual(orders["AAPL"].action, TradeAction.BUY)
         self.assertEqual(orders["AAPL"].amount, Decimal("1800.00"))
@@ -220,7 +218,7 @@ class TestPortfolioRebalance(unittest.TestCase):
         total_buy = sum(o.amount for o in orders if o.action == TradeAction.BUY)
         total_sell = sum(o.amount for o in orders if o.action == TradeAction.SELL)
 
-        self.assertAlmostEqual(total_buy, total_sell, places=9)
+        self.assertEqual(total_buy, total_sell)
 
     def test_empty_portfolio_returns_no_orders(self) -> None:
         meta = Stock("META", 500)
@@ -245,6 +243,44 @@ class TestPortfolioRebalance(unittest.TestCase):
         after_weights = portfolio.current_weights()
 
         self.assertEqual(before_weights, after_weights)
+
+    def test_near_unit_weights_are_normalized_to_preserve_self_financing(
+        self,
+    ) -> None:
+        """Weights within WEIGHT_TOLERANCE normalize to 1.0 so BUY == SELL."""
+        meta = Stock("META", 500)
+        aapl = Stock("AAPL", 200)
+
+        portfolio = Portfolio()
+        portfolio.add_holding(meta, 10)
+        portfolio.add_holding(aapl, 25)
+        portfolio.set_target_allocations(
+            {meta: Decimal("0.400001"), aapl: Decimal("0.60")}
+        )
+
+        orders = portfolio.rebalance()
+        total_buy = sum(o.amount for o in orders if o.action == TradeAction.BUY)
+        total_sell = sum(o.amount for o in orders if o.action == TradeAction.SELL)
+
+        self.assertEqual(total_buy, total_sell)
+
+    def test_high_price_disparity_preserves_funding_leg(self) -> None:
+        """Tiny monetary shifts on high-priced stocks still emit matching SELL/BUY."""
+        brk = Stock("BRK.A", 600000)
+        penny = Stock("PENNY", 1)
+
+        portfolio = Portfolio()
+        portfolio.add_holding(brk, 1)
+        portfolio.set_target_allocations(
+            {brk: Decimal("0.999999999"), penny: Decimal("0.000000001")}
+        )
+
+        orders = {o.stock_id: o for o in portfolio.rebalance()}
+
+        self.assertEqual(orders["BRK.A"].action, TradeAction.SELL)
+        self.assertEqual(orders["BRK.A"].amount, Decimal("0.000600000"))
+        self.assertEqual(orders["PENNY"].action, TradeAction.BUY)
+        self.assertEqual(orders["PENNY"].amount, Decimal("0.000600000"))
 
 
 if __name__ == "__main__":

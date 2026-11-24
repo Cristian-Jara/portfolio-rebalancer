@@ -10,7 +10,8 @@ Architectural Notes & Assumptions:
 - Runs in O(n) time and O(n) space for `n` distinct stocks.
 - Fractional shares are supported (exact dollar-to-share alignment).
 - Rebalancing is self-financing (total BUY value == total SELL value).
-- Target allocation weights must sum to 1.0 (100%) within `WEIGHT_TOLERANCE`.
+- Target allocation weights within `WEIGHT_TOLERANCE` are normalized to sum
+  strictly to 1.0 (100%).
 """
 
 from decimal import Decimal
@@ -58,8 +59,9 @@ class Portfolio:
         """
         Define the desired portfolio distribution (e.g., {meta: 0.40, aapl: 0.60}).
 
-        Validates that all weights are non-negative and sum to 1.0 (100%).
-        Replaces any previously configured target allocation.
+        Validates that all weights are non-negative and sum to 1.0 (100%),
+        normalizing them to sum strictly to 1.0 so rebalancing
+        remains strictly self-financing.
         """
         if not allocations:
             raise InvalidAllocationError(ErrorMessages.EMPTY_ALLOCATIONS)
@@ -91,6 +93,19 @@ class Portfolio:
             raise InvalidAllocationError(
                 ErrorMessages.WEIGHT_SUM_MISMATCH.format(total_weight=total_weight)
             )
+
+        if total_weight != Decimal("1"):
+            normalized_allocations = {
+                stock_id: weight / total_weight
+                for stock_id, weight in normalized_allocations.items()
+            }
+            residual = Decimal("1") - sum(normalized_allocations.values())
+            if residual != Decimal("0"):
+                largest_stock_id = max(
+                    normalized_allocations,
+                    key=lambda sid: normalized_allocations[sid],
+                )
+                normalized_allocations[largest_stock_id] += residual
 
         self._stocks.update(registered_stocks)
         self._allocations = normalized_allocations
@@ -153,7 +168,7 @@ class Portfolio:
             delta_value = target_value - current_value
             delta_shares = delta_value / price
 
-            if abs(delta_shares) <= self.SHARE_TOLERANCE:
+            if delta_value == Decimal("0"):
                 orders.append(
                     RebalanceOrder(
                         stock_id=stock_id,
@@ -164,7 +179,7 @@ class Portfolio:
                         target_weight=target_weight,
                     )
                 )
-            elif delta_shares > Decimal("0"):
+            elif delta_value > Decimal("0"):
                 orders.append(
                     RebalanceOrder(
                         stock_id=stock_id,

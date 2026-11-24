@@ -1,0 +1,21 @@
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+src = ["src", "test"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes (unused imports/variables)
+    "I",   # isort (import sorting)
+    "B",   # flake8-bugbear (common bugs & design anti-patterns)
+    "UP",  # pyupgrade (modern Python type hints & syntax)
+    "SIM", # flake8-simplify
+]
